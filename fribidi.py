@@ -5,6 +5,7 @@ import ctypes
 import sys
 
 
+
 libfribidi = ctypes.CDLL("libfribidi.so")
 
 
@@ -173,7 +174,7 @@ def log2vis (input_pyunicode, input_pbase_dir, with_l2v_position=False, with_v2l
     # memory allocations
 
     input_utc32_p = _pyunicode_to_utc32_p(input_pyunicode)
-    pbase_dir = ctypes.c_int32(input_pbase_dir)
+    pbase_dir_p = ctypes.pointer(ctypes.c_int32(input_pbase_dir))
 
     output_utc32_p = _malloc_utc32_array(input_len+1)
 
@@ -185,11 +186,10 @@ def log2vis (input_pyunicode, input_pbase_dir, with_l2v_position=False, with_v2l
     # calling fribidi_log2vis
 
     successed = libfribidi.fribidi_log2vis(
-
         # input
         input_utc32_p,
         input_len,
-        ctypes.pointer(pbase_dir),
+        pbase_dir_p,
 
         # output
         output_utc32_p,
@@ -225,7 +225,44 @@ def log2vis (input_pyunicode, input_pbase_dir, with_l2v_position=False, with_v2l
     return res
 
 
+def log2vis_get_embedding_levels (input_pyunicode, input_pbase_dir):
+    input_len = len(input_pyunicode)
+
+    # memory allocations
+
+    input_utc32_p = _pyunicode_to_utc32_p(input_pyunicode)
+    pbase_dir_p = ctypes.pointer(ctypes.c_int32(input_pbase_dir))
+
+    emb_p = _malloc_int8_array(input_len)
+
+
+    # calling fribidi_log2vis
+
+    successed = libfribidi.fribidi_log2vis_get_embedding_levels(
+        # input
+        input_utc32_p,
+        input_len,
+        pbase_dir_p,
+
+        # output
+        emb_p
+    )
+
+    if not successed:
+        raise Exception('fribidi_log2vis failed')
+
+
+    # pythonizing the output
+
+    res = [i for i in emb_p]
+
+    return res
+
+
 # Main
+
+VERSION = '0.05'
+
 
 def _test ():
     print log2vis(u"سلام", types.LTR, True, True, True)
@@ -237,8 +274,12 @@ def _test ():
     print log2vis(u"aسلام", types.LTR, True, True, True)
     print log2vis(u"aسلام", types.RTL, True, True, True)
 
+    print log2vis_get_embedding_levels(u"aسلام", types.LTR)
+    print log2vis_get_embedding_levels(u"aسلام", types.RTL)
+
 
 
 if __name__=='__main__':
     _test()
+
 
