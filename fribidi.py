@@ -4,7 +4,7 @@
 import ctypes
 
 
-VERSION = '0.06'
+VERSION = '0.08'
 
 _libfribidi = ctypes.CDLL("libfribidi.so")
 
@@ -216,9 +216,10 @@ def log2vis (unicode_text, base_direction, with_l2v_position=False, with_v2l_pos
     """
     Returns the visual order of characters in the text.
 
-    If with_l2v_position, with_v2l_position, or with_embedding_level are true,
-    the return value will an array, including logical-to-visual position,
-    visual-to-logical positions, or embedding-level arrays respectively.
+    If with_l2v_position, with_v2l_position, or with_embedding_level are
+    True, the return value will be a tuple including logical-to-visual
+    position, visual-to-logical positions, or embedding-level lists
+    respectively.
     """
 
     if unicode_text.__class__ != unicode:
@@ -233,9 +234,9 @@ def log2vis (unicode_text, base_direction, with_l2v_position=False, with_v2l_pos
 
     output_utc32_p = _malloc_utc32_array(input_len+1)
 
-    l2v_p = _malloc_int_array(input_len) if with_l2v_position else None
-    v2l_p = _malloc_int_array(input_len) if with_v2l_position else None
-    emb_p = _malloc_int8_array(input_len) if with_embedding_level else None
+    l2v_p = _malloc_int_array(input_len)    if with_l2v_position    else None
+    v2l_p = _malloc_int_array(input_len)    if with_v2l_position    else None
+    emb_p = _malloc_int8_array(input_len)   if with_embedding_level else None
 
 
     # Calling the api
@@ -277,15 +278,9 @@ def log2vis (unicode_text, base_direction, with_l2v_position=False, with_v2l_pos
 
     if with_l2v_position or with_v2l_position or with_embedding_level:
         res = (output_u, )
-
-        if with_l2v_position:
-            res += ([i for i in l2v_p], )
-
-        if with_v2l_position:
-            res += ([i for i in v2l_p], )
-
-        if with_embedding_level:
-            res += ([i for i in emb_p], )
+        if with_l2v_position:       res += ([i for i in l2v_p], )
+        if with_v2l_position:       res += ([i for i in v2l_p], )
+        if with_embedding_level:    res += ([i for i in emb_p], )
 
     else:
         res = output_u
@@ -345,9 +340,14 @@ def log2vis_get_embedding_levels (unicode_text, base_direction):
     return res
 
 
-def remove_bidi_marks (unicode_text, base_direction):
+def remove_bidi_marks (unicode_text, with_position_to=False, with_position_from=False, with_embedding_level=False):
     """
-    TODO
+    Returns the text with all Bidirectional Marks removed.
+
+    If with_position_to, with_position_from, or with_embedding_level are
+    True, the return value will be a tuple including positions from
+    input text to output text, positions from output text to input text,
+    or embedding-level lists respectively.
     """
 
     if unicode_text.__class__ != unicode:
@@ -355,43 +355,60 @@ def remove_bidi_marks (unicode_text, base_direction):
 
     input_len = len(unicode_text)
 
+
     # Memory allocations
 
     input_utc32_p = _pyunicode_to_utc32_p(unicode_text)
-    pbase_dir_p = ctypes.pointer(ctypes.c_int32(base_direction))
 
-    emb_p = _malloc_int8_array(input_len)
+    pto_p = _malloc_int_array(input_len*3)    if with_position_to     else None
+    pfr_p = _malloc_int_array(input_len)    if with_position_from   else None
+    emb_p = _malloc_int8_array(input_len)   if with_embedding_level else None
+    #print 'pto_p', pto_p
 
 
     # Calling the api
 
     """
     FRIBIDI_API FriBidiStrIndex fribidi_remove_bidi_marks (
+        /* input & output */
         FriBidiChar     *str,
+
+        /* input */
         FriBidiStrIndex length,
+
+        /* output */
         FriBidiStrIndex *position_to_this_list,
         FriBidiStrIndex *position_from_this_list,
         FriBidiLevel    *embedding_level_list
     );
     """
 
-    successed = _libfribidi.fribidi_remove_bidi_marks(
-        # input
+    new_length = _libfribidi.fribidi_remove_bidi_marks(
+        # input & output
         input_utc32_p,
+
+        # input
         input_len,
-        pbase_dir_p,
 
         # output
+        pto_p,
+        pfr_p,
         emb_p
     )
-
-    if not successed:
-        raise Exception('fribidi_remove_bidi_marks failed')
 
 
     # Pythonizing the output
 
-    res = [i for i in emb_p]
+    output_u = _utc32_p_to_pyunicode(input_utc32_p)
+
+    if with_position_to or with_position_from or with_embedding_level:
+        res = (output_u, )
+        if with_position_to:        res += ([i for i in pto_p], )
+        if with_position_from:      res += ([i for i in pfr_p], )
+        if with_embedding_level:    res += ([i for i in emb_p], )
+
+    else:
+        res = output_u
 
     return res
 
@@ -405,6 +422,10 @@ def _main ():
 
 
 def _test ():
+
+    print
+    print 'TEST log2vis()'
+
     print log2vis(u"سلام", types.LTR)
     print log2vis(u"سلام", types.LTR, True)
     print log2vis(u"سلام", types.LTR, False, True)
@@ -419,9 +440,25 @@ def _test ():
     print log2vis(u"aسلام", types.LTR, True, True, True)
     print log2vis(u"aسلام", types.RTL, True, True, True)
 
+    print
+    print 'TEST log2vis_get_embedding_levels()'
+
     print log2vis_get_embedding_levels("abc", types.LTR)
     print log2vis_get_embedding_levels(u"aسلام", types.LTR)
     print log2vis_get_embedding_levels(u"aسلام", types.RTL)
+
+    print
+    print 'TEST remove_bidi_marks()'
+
+    print remove_bidi_marks(u"سلامa")
+    print remove_bidi_marks(u"سلامa", False, True)
+    print remove_bidi_marks(u"سلامa", False, False, True)
+    print remove_bidi_marks(u"سلامa", True)
+
+    print remove_bidi_marks(u"سل‌ام")
+    print remove_bidi_marks(u"سل‌ام", True)
+    print remove_bidi_marks(u"سل‌ام", False, True)
+    print remove_bidi_marks(u"سل‌ام", False, False, True)
 
 
 if __name__=='__main__':
