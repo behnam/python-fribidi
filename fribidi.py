@@ -14,39 +14,39 @@ class types:
 
     # Define Masks
 
-    MASK_RTL        = 0x00000001L   # Is right to left
-    MASK_ARABIC     = 0x00000002L   # Is arabic
+    MASK_RTL        = 0x00000001   # Is right to left
+    MASK_ARABIC     = 0x00000002   # Is arabic
 
     # Each char can be only one of the three following.
-    MASK_STRONG     = 0x00000010L   # Is strong
-    MASK_WEAK       = 0x00000020L   # Is weak
-    MASK_NEUTRAL    = 0x00000040L   # Is neutral
+    MASK_STRONG     = 0x00000010   # Is strong
+    MASK_WEAK       = 0x00000020   # Is weak
+    MASK_NEUTRAL    = 0x00000040   # Is neutral
 
     # Each char can be only one of the five following.
-    MASK_LETTER     = 0x00000100L   # Is letter: L, R, AL
-    MASK_NUMBER     = 0x00000200L   # Is number: EN, AN
-    MASK_NUMSEPTER  = 0x00000400L   # Is number separator or terminator: ES, ET, CS
-    MASK_SPACE      = 0x00000800L   # Is space: BN, BS, SS, WS
-    MASK_EXPLICIT   = 0x00001000L   # Is expilict mark: LRE, RLE, LRO, RLO, PDF
+    MASK_LETTER     = 0x00000100   # Is letter: L, R, AL
+    MASK_NUMBER     = 0x00000200   # Is number: EN, AN
+    MASK_NUMSEPTER  = 0x00000400   # Is number separator or terminator: ES, ET, CS
+    MASK_SPACE      = 0x00000800   # Is space: BN, BS, SS, WS
+    MASK_EXPLICIT   = 0x00001000   # Is expilict mark: LRE, RLE, LRO, RLO, PDF
 
     # Can be on only if MASK_SPACE is also on.
-    MASK_SEPARATOR  = 0x00002000L   # Is test separator: BS, SS
+    MASK_SEPARATOR  = 0x00002000   # Is test separator: BS, SS
     # Can be on only if MASK_EXPLICIT is also on.
-    MASK_OVERRIDE   = 0x00004000L   # Is explicit override: LRO, RLO
+    MASK_OVERRIDE   = 0x00004000   # Is explicit override: LRO, RLO
 
     # The following must be to make types pairwise different, some of them can
     # be removed but are here because of efficiency (make queries faster).
 
-    MASK_ES     = 0x00010000L
-    MASK_ET     = 0x00020000L
-    MASK_CS     = 0x00040000L
+    MASK_ES     = 0x00010000
+    MASK_ET     = 0x00020000
+    MASK_CS     = 0x00040000
 
-    MASK_NSM    = 0x00080000L
-    MASK_BN     = 0x00100000L
+    MASK_NSM    = 0x00080000
+    MASK_BN     = 0x00100000
 
-    MASK_BS     = 0x00200000L
-    MASK_SS     = 0x00400000L
-    MASK_WS     = 0x00800000L
+    MASK_BS     = 0x00200000
+    MASK_SS     = 0x00400000
+    MASK_WS     = 0x00800000
 
     # Define values for FriBidiCharType
 
@@ -175,7 +175,7 @@ def log2vis (input_pyunicode, input_pbase_dir, with_l2v_position=False, with_v2l
     input_utc32_p = _pyunicode_to_utc32_p(input_pyunicode)
     pbase_dir = ctypes.c_int32(input_pbase_dir)
 
-    output_utc32_p = _malloc_utc32_array(input_len)
+    output_utc32_p = _malloc_utc32_array(input_len+1)
 
     l2v_p = _malloc_int_array(input_len) if with_l2v_position else None
     v2l_p = _malloc_int_array(input_len) if with_v2l_position else None
@@ -228,9 +228,14 @@ def log2vis (input_pyunicode, input_pbase_dir, with_l2v_position=False, with_v2l
 # Main
 
 def _test ():
-    i = u"سلام"
-    o = log2vis(i, 272, True, True, True) # LTR
-    print o
+    print log2vis(u"سلام", types.LTR, True, True, True)
+    print log2vis(u"سلام", types.RTL, True, True, True)
+
+    print log2vis(u"1سلام", types.LTR, True, True, True)
+    print log2vis(u"1سلام", types.RTL, True, True, True)
+
+    print log2vis(u"aسلام", types.LTR, True, True, True)
+    print log2vis(u"aسلام", types.RTL, True, True, True)
 
 
 
