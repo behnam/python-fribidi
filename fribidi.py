@@ -276,17 +276,16 @@ def log2vis (unicode_text, base_direction, with_l2v_position=False, with_v2l_pos
     output_u = _utc32_p_to_pyunicode(output_utc32_p)
 
     if with_l2v_position or with_v2l_position or with_embedding_level:
-
-        res = [output_u]
+        res = (output_u, )
 
         if with_l2v_position:
-            res.append([i for i in l2v_p])
+            res += ([i for i in l2v_p], )
 
         if with_v2l_position:
-            res.append([i for i in v2l_p])
+            res += ([i for i in v2l_p], )
 
         if with_embedding_level:
-            res.append([i for i in emb_p])
+            res += ([i for i in emb_p], )
 
     else:
         res = output_u
@@ -406,6 +405,11 @@ def _main ():
 
 
 def _test ():
+    print log2vis(u"سلام", types.LTR)
+    print log2vis(u"سلام", types.LTR, True)
+    print log2vis(u"سلام", types.LTR, False, True)
+    print log2vis(u"سلام", types.LTR, False, False, True)
+
     print log2vis(u"سلام", types.LTR, True, True, True)
     print log2vis(u"سلام", types.RTL, True, True, True)
 
