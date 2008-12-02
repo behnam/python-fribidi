@@ -1,19 +1,37 @@
 #!/usr/bin/env python
 # coding=UTF-8
 
+"""
+Wrapper of GNU FriBidi C library, an implementation of Unicode 
+
+python-fribidi is a python wrap of GNU FriBidi C library.
+http://fribidi.freedesktop.org/wiki/
+
+GNU FriBidi is an implementation of Unicode Bidirectional Algorithm.
+http://unicode.org/reports/tr9/
+
+"""
+
+
 import ctypes
 
 
-VERSION = '0.08'
+# Load FriBidi
 
 _libfribidi = ctypes.CDLL("libfribidi.so")
 
 
+# Versions
+
+VERSION = '0.08'
+"Version of the python wrapper."
+
+
 # Character Types
 
-class types:
+class Types:
     """
-    Defines character type masks and types.
+    Character types.
 
     Types:
 
@@ -39,25 +57,6 @@ class types:
         WS      Whitespace
         ON      Other Neutral
 
-    Maskes:
-
-        MASK_RTL        Is right to left
-        MASK_ARABIC     Is arabic
-
-    Each character can be only one of the three following:
-        MASK_STRONG     Is strong
-        MASK_WEAK       Is weak
-        MASK_NEUTRAL    Is neutral
-
-    Each charcter can be only one of the five following:
-        MASK_LETTER     Is letter: L, R, AL
-        MASK_NUMBER     Is number: EN, AN
-        MASK_NUMSEPTER  Is number separator or terminator: ES, ET, CS
-        MASK_SPACE      Is space: BN, BS, SS, WS
-        MASK_EXPLICIT   Is expilict mark: LRE, RLE, LRO, RLO, PDF
-
-        MASK_SEPARATOR  Is test separator: BS, SS; and can be on only if MASK_SPACE is also on.
-        MASK_OVERRIDE   Is explicit override: LRO, RLO; and can be on only if MASK_EXPLICIT is also on.
     """
 
     # Define Masks
@@ -65,10 +64,12 @@ class types:
     MASK_RTL        = 0x00000001   # Is right to left
     MASK_ARABIC     = 0x00000002   # Is arabic
 
+    # Each character can be only one of the three following:
     MASK_STRONG     = 0x00000010   # Is strong
     MASK_WEAK       = 0x00000020   # Is weak
     MASK_NEUTRAL    = 0x00000040   # Is neutral
 
+    # Each charcter can be only one of the five following:
     MASK_LETTER     = 0x00000100   # Is letter: L, R, AL
     MASK_NUMBER     = 0x00000200   # Is number: EN, AN
     MASK_NUMSEPTER  = 0x00000400   # Is number separator or terminator: ES, ET, CS
@@ -120,91 +121,78 @@ class types:
 
 # Memory allocation functions
 
+def _malloc_int_array (n):
 
-def _malloc_int_array (l):
-    """
-    Returns a pointer to allocated C int array of length `l'
-    """
-
-    t = ctypes.c_int * l
-    return t()
-
-def _malloc_int8_array (l):
-    """
-    Returns a pointer to allocated C int array of length `l'
+    """Return a pointer to allocated C int array of length `n'.
     """
 
-    t = ctypes.c_int8 * l
+    t = ctypes.c_int * n
     return t()
 
 
-def _malloc_utf8_array (l):
-    """
-    Returns a pointer to allocated UTF8 (C char) array of length `l'
+def _malloc_int8_array (n):
+
+    """Return a pointer to allocated C int array of length `n'.
     """
 
-    t = ctypes.c_char * l
+    t = ctypes.c_int8 * n
+    return t()
+
+
+def _malloc_utf8_array (n):
+
+    """Return a pointer to allocated UTF8 (C char) array of length `n'.
+    """
+
+    t = ctypes.c_char * n
     return t()
 
 
 def _malloc_utf8_array_from_string (s):
-    """
-    Returns a pointer to allocated UTF8 (C char) array, initialized with value of `s'
+
+    """Return a pointer to allocated UTF8 (C char) array, initialized with `s'.
     """
 
     return ctypes.c_char_p(s)
 
 
-def _malloc_utc32_array (l):
-    """
-    Returns a pointer to allocated UTC32 (C int32) array of length `l'
+def _malloc_utf32_array (n):
+
+    """Return a pointer to allocated UTF32 (C int32) array of length `n'.
     """
 
-    t = ctypes.c_uint32 * l
+    t = ctypes.c_uint32 * n
     return t()
 
 
 # Unicode type convertors
 
-def _pyunicode_to_utc32_p (a_pyunicode):
-    """
-    Converts Python Unicode instance to UTC32 (C int32) array
+def _pyunicode_to_utf32_p (a_pyunicode):
+    """Return UTF32 (C int32) array from Py_Unicode.
     """
 
     a_len = len(a_pyunicode)
-
-    #print 'a_len', a_len
 
     utf8_pystr = a_pyunicode.encode('UTF-8')
     utf8_len = len(utf8_pystr)
     utf8_p = _malloc_utf8_array_from_string(utf8_pystr)
 
-    #print 'utf8_p.value', utf8_p.value
-    #print 'utf8_len', utf8_len
+    utf32_p = _malloc_utf32_array(a_len+1)
+    _libfribidi.fribidi_utf8_to_unicode (utf8_p, utf8_len, utf32_p)
 
-    utc32_p = _malloc_utc32_array(a_len+1)
-    _libfribidi.fribidi_utf8_to_unicode (utf8_p, utf8_len, utc32_p)
-
-    #print 'utc32_p [%04x, %04x, %04x, %04x]' % (utc32_p[0], utc32_p[1], utc32_p[2], utc32_p[3])
-
-    # XX: Caller should free it!
-    return utc32_p
+    return utf32_p
 
 
-def _utc32_p_to_pyunicode (a_utc32_p):
-    """
-    Converts UTC32 (C int32) array to Python Unicode instance
+def _utf32_p_to_pyunicode (a_utf32_p):
+    """Return Py_Unicode from UTF32 (C int32) array.
     """
 
-    #print 'a_utc32_p [%04x, %04x, %04x, %04x]' % (a_utc32_p[0], a_utc32_p[1], a_utc32_p[2], a_utc32_p[3])
+    utf32_len = ctypes.sizeof(a_utf32_p) / ctypes.sizeof(ctypes.c_uint32)
 
-    utc32_len = ctypes.sizeof(a_utc32_p) / ctypes.sizeof(ctypes.c_uint32)
-    #print 'utc32_len', utc32_len
-
-    utf8_len = 6*utc32_len+1
+    utf8_len = 6*utf32_len+1
     utf8_p = _malloc_utf8_array(utf8_len)
 
-    _libfribidi.fribidi_unicode_to_utf8 (a_utc32_p, utc32_len, utf8_p)
+    _libfribidi.fribidi_unicode_to_utf8 (a_utf32_p, utf32_len, utf8_p)
 
     return utf8_p.value
 
@@ -214,12 +202,12 @@ def _utc32_p_to_pyunicode (a_utc32_p):
 
 def log2vis (unicode_text, base_direction, with_l2v_position=False, with_v2l_position=False, with_embedding_level=False):
     """
-    Returns the visual order of characters in the text.
+    Return a unicode text contaning the visual order of characters in the text.
 
-    If with_l2v_position, with_v2l_position, or with_embedding_level are
-    True, the return value will be a tuple including logical-to-visual
-    position, visual-to-logical positions, or embedding-level lists
-    respectively.
+    If with_l2v_position, with_v2l_position, or with_embedding_level are True,
+    the return value will be a tuple including logical-to-visual position,
+    visual-to-logical positions, or embedding-level lists respectively.
+
     """
 
     if unicode_text.__class__ != unicode:
@@ -229,15 +217,14 @@ def log2vis (unicode_text, base_direction, with_l2v_position=False, with_v2l_pos
 
     # Memory allocations
 
-    input_utc32_p = _pyunicode_to_utc32_p(unicode_text)
+    input_utf32_p = _pyunicode_to_utf32_p(unicode_text)
     pbase_dir_p = ctypes.pointer(ctypes.c_int32(base_direction))
 
-    output_utc32_p = _malloc_utc32_array(input_len+1)
+    output_utf32_p = _malloc_utf32_array(input_len+1)
 
     l2v_p = _malloc_int_array(input_len)    if with_l2v_position    else None
     v2l_p = _malloc_int_array(input_len)    if with_v2l_position    else None
     emb_p = _malloc_int8_array(input_len)   if with_embedding_level else None
-
 
     # Calling the api
 
@@ -257,12 +244,12 @@ def log2vis (unicode_text, base_direction, with_l2v_position=False, with_v2l_pos
 
     successed = _libfribidi.fribidi_log2vis(
         # input
-        input_utc32_p,
+        input_utf32_p,
         input_len,
         pbase_dir_p,
 
         # output
-        output_utc32_p,
+        output_utf32_p,
         l2v_p,
         v2l_p,
         emb_p
@@ -271,10 +258,9 @@ def log2vis (unicode_text, base_direction, with_l2v_position=False, with_v2l_pos
     if not successed:
         raise Exception('fribidi_log2vis failed')
 
-
     # Pythonizing the output
 
-    output_u = _utc32_p_to_pyunicode(output_utc32_p)
+    output_u = _utf32_p_to_pyunicode(output_utf32_p)
 
     if with_l2v_position or with_v2l_position or with_embedding_level:
         res = (output_u, )
@@ -289,8 +275,10 @@ def log2vis (unicode_text, base_direction, with_l2v_position=False, with_v2l_pos
 
 
 def log2vis_get_embedding_levels (unicode_text, base_direction):
+
     """
-    Returns the embedding-level of characters in the text.
+    Return an array containing the embedding-level of characters in the text.
+
     """
 
     if unicode_text.__class__ != unicode:
@@ -300,11 +288,10 @@ def log2vis_get_embedding_levels (unicode_text, base_direction):
 
     # Memory allocations
 
-    input_utc32_p = _pyunicode_to_utc32_p(unicode_text)
+    input_utf32_p = _pyunicode_to_utf32_p(unicode_text)
     pbase_dir_p = ctypes.pointer(ctypes.c_int32(base_direction))
 
     emb_p = _malloc_int8_array(input_len)
-
 
     # Calling the api
 
@@ -321,7 +308,7 @@ def log2vis_get_embedding_levels (unicode_text, base_direction):
 
     successed = _libfribidi.fribidi_log2vis_get_embedding_levels(
         # input
-        input_utc32_p,
+        input_utf32_p,
         input_len,
         pbase_dir_p,
 
@@ -332,7 +319,6 @@ def log2vis_get_embedding_levels (unicode_text, base_direction):
     if not successed:
         raise Exception('fribidi_log2vis_get_embedding_levels failed')
 
-
     # Pythonizing the output
 
     res = [i for i in emb_p]
@@ -341,13 +327,18 @@ def log2vis_get_embedding_levels (unicode_text, base_direction):
 
 
 def remove_bidi_marks (unicode_text, with_position_to=False, with_position_from=False, with_embedding_level=False):
-    """
-    Returns the text with all Bidirectional Marks removed.
 
-    If with_position_to, with_position_from, or with_embedding_level are
-    True, the return value will be a tuple including positions from
-    input text to output text, positions from output text to input text,
-    or embedding-level lists respectively.
+    """
+    Return the text with all Bidirectional Marks removed.
+
+    If with_position_to, with_position_from, or with_embedding_level are True,
+    the return value will be a tuple including positions from input text to
+    output text, positions from output text to input text, or embedding-level
+    lists respectively.
+
+    Note: Seems the optional parameters of fribidi_remove_bidi_marks() doesn't
+    work or crash.  Use them at your own risk.
+
     """
 
     if unicode_text.__class__ != unicode:
@@ -355,16 +346,13 @@ def remove_bidi_marks (unicode_text, with_position_to=False, with_position_from=
 
     input_len = len(unicode_text)
 
-
     # Memory allocations
 
-    input_utc32_p = _pyunicode_to_utc32_p(unicode_text)
+    input_utf32_p = _pyunicode_to_utf32_p(unicode_text)
 
     pto_p = _malloc_int_array(input_len*3)    if with_position_to     else None
     pfr_p = _malloc_int_array(input_len)    if with_position_from   else None
     emb_p = _malloc_int8_array(input_len)   if with_embedding_level else None
-    #print 'pto_p', pto_p
-
 
     # Calling the api
 
@@ -385,7 +373,7 @@ def remove_bidi_marks (unicode_text, with_position_to=False, with_position_from=
 
     new_length = _libfribidi.fribidi_remove_bidi_marks(
         # input & output
-        input_utc32_p,
+        input_utf32_p,
 
         # input
         input_len,
@@ -399,7 +387,7 @@ def remove_bidi_marks (unicode_text, with_position_to=False, with_position_from=
 
     # Pythonizing the output
 
-    output_u = _utc32_p_to_pyunicode(input_utc32_p)
+    output_u = _utf32_p_to_pyunicode(input_utf32_p)
 
     if with_position_to or with_position_from or with_embedding_level:
         res = (output_u, )
@@ -416,9 +404,15 @@ def remove_bidi_marks (unicode_text, with_position_to=False, with_position_from=
 # Main
 
 def _main ():
+
+    """
+    Return visual text of command-line parameters (as a whole).
+
+    """
+
     import sys
     text = ' '.join(sys.argv[1:]).decode('UTF-8')
-    print log2vis(text, types.LTR)
+    print log2vis(text, Types.LTR)
 
 
 def _test ():
@@ -426,26 +420,26 @@ def _test ():
     print
     print 'TEST log2vis()'
 
-    print log2vis(u"سلام", types.LTR)
-    print log2vis(u"سلام", types.LTR, True)
-    print log2vis(u"سلام", types.LTR, False, True)
-    print log2vis(u"سلام", types.LTR, False, False, True)
+    print log2vis(u"سلام", Types.LTR)
+    print log2vis(u"سلام", Types.LTR, True)
+    print log2vis(u"سلام", Types.LTR, False, True)
+    print log2vis(u"سلام", Types.LTR, False, False, True)
 
-    print log2vis(u"سلام", types.LTR, True, True, True)
-    print log2vis(u"سلام", types.RTL, True, True, True)
+    print log2vis(u"سلام", Types.LTR, True, True, True)
+    print log2vis(u"سلام", Types.RTL, True, True, True)
 
-    print log2vis(u"1سلام", types.LTR, True, True, True)
-    print log2vis(u"1سلام", types.RTL, True, True, True)
+    print log2vis(u"1سلام", Types.LTR, True, True, True)
+    print log2vis(u"1سلام", Types.RTL, True, True, True)
 
-    print log2vis(u"aسلام", types.LTR, True, True, True)
-    print log2vis(u"aسلام", types.RTL, True, True, True)
+    print log2vis(u"aسلام", Types.LTR, True, True, True)
+    print log2vis(u"aسلام", Types.RTL, True, True, True)
 
     print
     print 'TEST log2vis_get_embedding_levels()'
 
-    print log2vis_get_embedding_levels("abc", types.LTR)
-    print log2vis_get_embedding_levels(u"aسلام", types.LTR)
-    print log2vis_get_embedding_levels(u"aسلام", types.RTL)
+    print log2vis_get_embedding_levels("abc", Types.LTR)
+    print log2vis_get_embedding_levels(u"aسلام", Types.LTR)
+    print log2vis_get_embedding_levels(u"aسلام", Types.RTL)
 
     print
     print 'TEST remove_bidi_marks()'
@@ -456,9 +450,9 @@ def _test ():
     print remove_bidi_marks(u"سلامa", True)
 
     print remove_bidi_marks(u"سل‌ام")
-    print remove_bidi_marks(u"سل‌ام", True)
-    print remove_bidi_marks(u"سل‌ام", False, True)
-    print remove_bidi_marks(u"سل‌ام", False, False, True)
+    #print remove_bidi_marks(u"سل‌ام", True)
+    #print remove_bidi_marks(u"سل‌ام", False, True)
+    #print remove_bidi_marks(u"سل‌ام", False, False, True)
 
 
 if __name__=='__main__':
