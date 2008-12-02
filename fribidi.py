@@ -2,12 +2,12 @@
 # coding=UTF-8
 
 """
-Wrapper of GNU FriBidi C library, an implementation of Unicode 
+an implementation of Unicode  Bidirectional algorithm, using GNU FriBidi
 
 python-fribidi is a python wrap of GNU FriBidi C library.
 http://fribidi.freedesktop.org/wiki/
 
-GNU FriBidi is an implementation of Unicode Bidirectional Algorithm.
+GNU FriBidi is an implementation of Unicode Bidirectional algorithm.
 http://unicode.org/reports/tr9/
 
 """
@@ -23,7 +23,7 @@ _libfribidi = ctypes.CDLL("libfribidi.so")
 
 # Versions
 
-VERSION = '0.08'
+VERSION = '0.09'
 "Version of the python wrapper."
 
 
@@ -350,7 +350,7 @@ def remove_bidi_marks (unicode_text, with_position_to=False, with_position_from=
 
     input_utf32_p = _pyunicode_to_utf32_p(unicode_text)
 
-    pto_p = _malloc_int_array(input_len*3)    if with_position_to     else None
+    pto_p = _malloc_int_array(input_len)    if with_position_to     else None
     pfr_p = _malloc_int_array(input_len)    if with_position_from   else None
     emb_p = _malloc_int8_array(input_len)   if with_embedding_level else None
 
