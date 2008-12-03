@@ -20,6 +20,19 @@ import ctypes
 
 _libfribidi = ctypes.CDLL("libfribidi.so")
 
+try:
+    _libfribidi.fribidi_shape()
+except AttributeError:
+    libfribidi_version = '0.1'
+    libfribidi_version_major = 0
+    libfribidi_version_minor = 1
+else:
+    libfribidi_version = '0.2'
+    libfribidi_version_major = 0
+    libfribidi_version_minor = 2
+
+print libfribidi_version, libfribidi_version_major, libfribidi_version_minor
+
 
 # Versions
 
@@ -567,6 +580,20 @@ def get_mirror_prop(unicode_text):
     return res
 
 
+def get_version_info():
+
+    """
+    Return TODO
+
+    TODO.
+
+    """
+
+    # TODO
+
+    return str(_libfribidi.fribidi_version_info)
+
+
 # Main
 
 def _main():
@@ -584,6 +611,10 @@ def _main():
 def _test():
 
     print
+    print 'Loaded: %s' % _libfribidi
+    print
+
+    print
     print 'TEST log2vis()'
     print
 
@@ -595,9 +626,6 @@ def _test():
     print log2vis(u"سلام", None, True)
     print log2vis(u"سلام", None, False, True)
     print log2vis(u"سلام", None, False, False, True)
-
-    print log2vis(u"سلام", CharType.LTR, True, True, True)
-    print log2vis(u"سلام", CharType.RTL, True, True, True)
 
     print log2vis(u"1سلام", CharType.LTR, True, True, True)
     print log2vis(u"1سلام", CharType.RTL, True, True, True)
@@ -637,14 +665,15 @@ def _test():
     #print remove_bidi_marks(u"سل‌ام", False, True)
     #print remove_bidi_marks(u"سل‌ام", False, False, True)
 
-    print
-    print 'TEST get_types()'
-    print
+    if libfribidi_version_major == 1:
+        print
+        print 'TEST get_types()'
+        print
 
-    print get_types(123)
-    print get_types(u"سل‌ام")
-    print get_types(u"سل‌ام").__class__
-    print
+        print get_types(123)
+        print get_types(u"سل‌ام")
+        print get_types(u"سل‌ام").__class__
+        print
 
     print
     print 'TEST get_mirror_chars()'
@@ -668,10 +697,13 @@ def _test():
     print get_mirror_prop(u"سل‌ام").__class__
     print
 
-    a="()"; print a, get_mirror_prop(a)
-    a=u"«»"; print a, get_mirror_prop(a)
-    a=u"﴾﴿"; print a, get_mirror_prop(a)
+    print u"() «» ﴾﴿", get_mirror_prop(u"() «» ﴾﴿")
 
+    print
+    print 'TEST get_version_info()'
+    print
+
+    print get_version_info()
 
 if __name__=='__main__':
     _main()
