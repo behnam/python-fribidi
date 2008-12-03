@@ -2,12 +2,12 @@
 # coding=UTF-8
 
 """
-an implementation of Unicode  Bidirectional algorithm, using GNU FriBidi
+an implementation of Unicode Bidirectional Algorithm, using GNU FriBidi
 
-python-fribidi is a python wrap of GNU FriBidi C library.
-http://fribidi.freedesktop.org/wiki/
+`python-fribidi' is a python wrap of GNU FriBidi C library.
+http://fribidi.org/
 
-GNU FriBidi is an implementation of Unicode Bidirectional algorithm.
+GNU FriBidi is an implementation of Unicode Bidirectional Algorithm (bidi).
 http://unicode.org/reports/tr9/
 
 """
@@ -29,9 +29,9 @@ VERSION = '0.09'
 
 # Character Types
 
-class Types:
+class CharType:
     """
-    Character types.
+    Class of character types, as return by get_types(), etc.
 
     Types:
 
@@ -121,7 +121,7 @@ class Types:
 
 # Memory allocation functions
 
-def _malloc_int_array (n):
+def _malloc_int_array(n):
 
     """Return a pointer to allocated C int array of length `n'.
     """
@@ -130,7 +130,7 @@ def _malloc_int_array (n):
     return t()
 
 
-def _malloc_int8_array (n):
+def _malloc_int8_array(n):
 
     """Return a pointer to allocated C int array of length `n'.
     """
@@ -139,24 +139,7 @@ def _malloc_int8_array (n):
     return t()
 
 
-def _malloc_utf8_array (n):
-
-    """Return a pointer to allocated UTF8 (C char) array of length `n'.
-    """
-
-    t = ctypes.c_char * n
-    return t()
-
-
-def _malloc_utf8_array_from_string (s):
-
-    """Return a pointer to allocated UTF8 (C char) array, initialized with `s'.
-    """
-
-    return ctypes.c_char_p(s)
-
-
-def _malloc_utf32_array (n):
+def _malloc_int32_array(n):
 
     """Return a pointer to allocated UTF32 (C int32) array of length `n'.
     """
@@ -165,9 +148,26 @@ def _malloc_utf32_array (n):
     return t()
 
 
+def _malloc_char_array(n):
+
+    """Return a pointer to allocated UTF8 (C char) array of length `n'.
+    """
+
+    t = ctypes.c_char * n
+    return t()
+
+
+def _malloc_char_array_from_string(s):
+
+    """Return a pointer to allocated UTF8 (C char) array, initialized with `s'.
+    """
+
+    return ctypes.c_char_p(s)
+
+
 # Unicode type convertors
 
-def _pyunicode_to_utf32_p (a_pyunicode):
+def _pyunicode_to_utf32_p(a_pyunicode):
     """Return UTF32 (C int32) array from Py_Unicode.
     """
 
@@ -175,24 +175,24 @@ def _pyunicode_to_utf32_p (a_pyunicode):
 
     utf8_pystr = a_pyunicode.encode('UTF-8')
     utf8_len = len(utf8_pystr)
-    utf8_p = _malloc_utf8_array_from_string(utf8_pystr)
+    utf8_p = _malloc_char_array_from_string(utf8_pystr)
 
-    utf32_p = _malloc_utf32_array(a_len+1)
-    _libfribidi.fribidi_utf8_to_unicode (utf8_p, utf8_len, utf32_p)
+    utf32_p = _malloc_int32_array(a_len+1)
+    _libfribidi.fribidi_utf8_to_unicode(utf8_p, utf8_len, utf32_p)
 
     return utf32_p
 
 
-def _utf32_p_to_pyunicode (a_utf32_p):
+def _utf32_p_to_pyunicode(a_utf32_p):
     """Return Py_Unicode from UTF32 (C int32) array.
     """
 
     utf32_len = ctypes.sizeof(a_utf32_p) / ctypes.sizeof(ctypes.c_uint32)
 
     utf8_len = 6*utf32_len+1
-    utf8_p = _malloc_utf8_array(utf8_len)
+    utf8_p = _malloc_char_array(utf8_len)
 
-    _libfribidi.fribidi_unicode_to_utf8 (a_utf32_p, utf32_len, utf8_p)
+    _libfribidi.fribidi_unicode_to_utf8(a_utf32_p, utf32_len, utf8_p)
 
     return utf8_p.value
 
@@ -200,7 +200,7 @@ def _utf32_p_to_pyunicode (a_utf32_p):
 
 # FriBidi API
 
-def log2vis (unicode_text, base_direction, with_l2v_position=False, with_v2l_position=False, with_embedding_level=False):
+def log2vis(unicode_text, base_direction, with_l2v_position=False, with_v2l_position=False, with_embedding_level=False):
     """
     Return a unicode text contaning the visual order of characters in the text.
 
@@ -213,27 +213,29 @@ def log2vis (unicode_text, base_direction, with_l2v_position=False, with_v2l_pos
     if unicode_text.__class__ != unicode:
         unicode_text = unicode(unicode_text)
 
-    input_len = len(unicode_text)
+    text_len = len(unicode_text)
 
     # Memory allocations
 
     input_utf32_p = _pyunicode_to_utf32_p(unicode_text)
     pbase_dir_p = ctypes.pointer(ctypes.c_int32(base_direction))
 
-    output_utf32_p = _malloc_utf32_array(input_len+1)
+    output_utf32_p = _malloc_int32_array(text_len+1)
 
-    l2v_p = _malloc_int_array(input_len)    if with_l2v_position    else None
-    v2l_p = _malloc_int_array(input_len)    if with_v2l_position    else None
-    emb_p = _malloc_int8_array(input_len)   if with_embedding_level else None
+    l2v_p = _malloc_int_array(text_len)     if with_l2v_position    else None
+    v2l_p = _malloc_int_array(text_len)     if with_v2l_position    else None
+    emb_p = _malloc_int8_array(text_len)    if with_embedding_level else None
 
-    # Calling the api
+    # Calling the API
 
     """
     FRIBIDI_API fribidi_boolean fribidi_log2vis (
+
         /* input */
         FriBidiChar     *str,
         FriBidiStrIndex len,
         FriBidiCharType *pbase_dirs,
+
         /* output */
         FriBidiChar     *visual_str,
         FriBidiStrIndex *position_L_to_V_list,
@@ -245,7 +247,7 @@ def log2vis (unicode_text, base_direction, with_l2v_position=False, with_v2l_pos
     successed = _libfribidi.fribidi_log2vis(
         # input
         input_utf32_p,
-        input_len,
+        text_len,
         pbase_dir_p,
 
         # output
@@ -274,7 +276,7 @@ def log2vis (unicode_text, base_direction, with_l2v_position=False, with_v2l_pos
     return res
 
 
-def log2vis_get_embedding_levels (unicode_text, base_direction):
+def log2vis_get_embedding_levels(unicode_text, base_direction):
 
     """
     Return an array containing the embedding-level of characters in the text.
@@ -284,23 +286,25 @@ def log2vis_get_embedding_levels (unicode_text, base_direction):
     if unicode_text.__class__ != unicode:
         unicode_text = unicode(unicode_text)
 
-    input_len = len(unicode_text)
+    text_len = len(unicode_text)
 
     # Memory allocations
 
     input_utf32_p = _pyunicode_to_utf32_p(unicode_text)
     pbase_dir_p = ctypes.pointer(ctypes.c_int32(base_direction))
 
-    emb_p = _malloc_int8_array(input_len)
+    emb_p = _malloc_int8_array(text_len)
 
-    # Calling the api
+    # Calling the API
 
     """
     FRIBIDI_API fribidi_boolean fribidi_log2vis_get_embedding_levels (
+
         /* input */
         FriBidiChar     *str,
         FriBidiStrIndex len,
         FriBidiCharType *pbase_dir,
+
         /* output */
         FriBidiLevel    *embedding_level_list
     );
@@ -309,7 +313,7 @@ def log2vis_get_embedding_levels (unicode_text, base_direction):
     successed = _libfribidi.fribidi_log2vis_get_embedding_levels(
         # input
         input_utf32_p,
-        input_len,
+        text_len,
         pbase_dir_p,
 
         # output
@@ -326,7 +330,7 @@ def log2vis_get_embedding_levels (unicode_text, base_direction):
     return res
 
 
-def remove_bidi_marks (unicode_text, with_position_to=False, with_position_from=False, with_embedding_level=False):
+def remove_bidi_marks(unicode_text, with_position_to=False, with_position_from=False, with_embedding_level=False):
 
     """
     Return the text with all Bidirectional Marks removed.
@@ -344,20 +348,21 @@ def remove_bidi_marks (unicode_text, with_position_to=False, with_position_from=
     if unicode_text.__class__ != unicode:
         unicode_text = unicode(unicode_text)
 
-    input_len = len(unicode_text)
+    text_len = len(unicode_text)
 
     # Memory allocations
 
     input_utf32_p = _pyunicode_to_utf32_p(unicode_text)
 
-    pto_p = _malloc_int_array(input_len)    if with_position_to     else None
-    pfr_p = _malloc_int_array(input_len)    if with_position_from   else None
-    emb_p = _malloc_int8_array(input_len)   if with_embedding_level else None
+    pto_p = _malloc_int_array(text_len)     if with_position_to     else None
+    pfr_p = _malloc_int_array(text_len)     if with_position_from   else None
+    emb_p = _malloc_int8_array(text_len)    if with_embedding_level else None
 
-    # Calling the api
+    # Calling the API
 
     """
     FRIBIDI_API FriBidiStrIndex fribidi_remove_bidi_marks (
+
         /* input & output */
         FriBidiChar     *str,
 
@@ -376,7 +381,7 @@ def remove_bidi_marks (unicode_text, with_position_to=False, with_position_from=
         input_utf32_p,
 
         # input
-        input_len,
+        text_len,
 
         # output
         pto_p,
@@ -401,9 +406,54 @@ def remove_bidi_marks (unicode_text, with_position_to=False, with_position_from=
     return res
 
 
+def get_types(unicode_text):
+
+    """
+    Return TODO
+
+    TODO.
+    """
+
+    if unicode_text.__class__ != unicode:
+        unicode_text = unicode(unicode_text)
+
+    text_len = len(unicode_text)
+
+    # Memory allocations
+
+    input_utf32_p = _pyunicode_to_utf32_p(unicode_text)
+
+    output_chartype_p = _malloc_int32_array(text_len)
+
+    # Calling the API
+
+    """
+    FRIBIDI_API void fribidi_get_types (
+
+        /* input */
+        FriBidiChar *str,
+        FriBidiStrIndex len,
+
+        /* output */
+        FriBidiCharType *type
+    );
+    """
+
+    _libfribidi.fribidi_get_types(
+        # input
+        input_utf32_p,
+        text_len,
+        output_chartype_p
+    )
+
+    # Pythonizing the output
+
+    return [i for i in output_chartype_p]
+
+
 # Main
 
-def _main ():
+def _main():
 
     """
     Return visual text of command-line parameters (as a whole).
@@ -412,47 +462,52 @@ def _main ():
 
     import sys
     text = ' '.join(sys.argv[1:]).decode('UTF-8')
-    print log2vis(text, Types.LTR)
+    print log2vis(text, CharType.LTR)
 
 
-def _test ():
+def _test():
 
     print
     print 'TEST log2vis()'
 
-    print log2vis(u"سلام", Types.LTR)
-    print log2vis(u"سلام", Types.LTR, True)
-    print log2vis(u"سلام", Types.LTR, False, True)
-    print log2vis(u"سلام", Types.LTR, False, False, True)
+    print log2vis(u"سلام", CharType.LTR)
+    print log2vis(u"سلام", CharType.LTR, True)
+    print log2vis(u"سلام", CharType.LTR, False, True)
+    print log2vis(u"سلام", CharType.LTR, False, False, True)
 
-    print log2vis(u"سلام", Types.LTR, True, True, True)
-    print log2vis(u"سلام", Types.RTL, True, True, True)
+    print log2vis(u"سلام", CharType.LTR, True, True, True)
+    print log2vis(u"سلام", CharType.RTL, True, True, True)
 
-    print log2vis(u"1سلام", Types.LTR, True, True, True)
-    print log2vis(u"1سلام", Types.RTL, True, True, True)
+    print log2vis(u"1سلام", CharType.LTR, True, True, True)
+    print log2vis(u"1سلام", CharType.RTL, True, True, True)
 
-    print log2vis(u"aسلام", Types.LTR, True, True, True)
-    print log2vis(u"aسلام", Types.RTL, True, True, True)
+    print log2vis(u"aسلام", CharType.LTR, True, True, True)
+    print log2vis(u"aسلام", CharType.RTL, True, True, True)
 
     print
     print 'TEST log2vis_get_embedding_levels()'
 
-    print log2vis_get_embedding_levels("abc", Types.LTR)
-    print log2vis_get_embedding_levels(u"aسلام", Types.LTR)
-    print log2vis_get_embedding_levels(u"aسلام", Types.RTL)
+    print log2vis_get_embedding_levels("abc", CharType.LTR)
+    print log2vis_get_embedding_levels(u"aسلام", CharType.LTR)
+    print log2vis_get_embedding_levels(u"aسلام", CharType.RTL)
 
     print
     print 'TEST remove_bidi_marks()'
 
     print remove_bidi_marks(u"سلامa")
-    print remove_bidi_marks(u"سلامa", False, True)
-    print remove_bidi_marks(u"سلامa", False, False, True)
-    print remove_bidi_marks(u"سلامa", True)
+    #print remove_bidi_marks(u"سلامa", False, True)
+    #print remove_bidi_marks(u"سلامa", False, False, True)
+    #print remove_bidi_marks(u"سلامa", True)
 
     print remove_bidi_marks(u"سل‌ام")
     #print remove_bidi_marks(u"سل‌ام", True)
     #print remove_bidi_marks(u"سل‌ام", False, True)
     #print remove_bidi_marks(u"سل‌ام", False, False, True)
+
+    print
+    print 'TEST get_types()'
+
+    print get_types(u"سل‌ام")
 
 
 if __name__=='__main__':
