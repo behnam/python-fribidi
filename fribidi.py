@@ -194,24 +194,31 @@ def _utf32_p_to_pyunicode(a_utf32_p):
 
     _libfribidi.fribidi_unicode_to_utf8(a_utf32_p, utf32_len, utf8_p)
 
-    return utf8_p.value
+    return utf8_p.value.decode('UTF-8')
 
 
 
 # FriBidi API
 
-def log2vis(unicode_text, base_direction, with_l2v_position=False, with_v2l_position=False, with_embedding_level=False):
+def log2vis(unicode_text, base_direction=None, with_l2v_position=False, with_v2l_position=False, with_embedding_level=False):
     """
     Return a unicode text contaning the visual order of characters in the text.
 
-    If with_l2v_position, with_v2l_position, or with_embedding_level are True,
-    the return value will be a tuple including logical-to-visual position,
-    visual-to-logical positions, or embedding-level lists respectively.
+    If paragraph direction is not set (`base_direction'), it will be assumed to
+    to be letf-to-right (LTR).
+
+    If any of with_l2v_position, with_v2l_position, and with_embedding_level
+    are True, the return value will be a tuple including logical-to-visual
+    position, visual-to-logical positions, or embedding-level lists
+    respectively.
 
     """
 
-    if unicode_text.__class__ != unicode:
+    if not isinstance(unicode_text, unicode):
         unicode_text = unicode(unicode_text)
+
+    if base_direction is None:
+        base_direction=CharType.LTR
 
     text_len = len(unicode_text)
 
@@ -276,15 +283,18 @@ def log2vis(unicode_text, base_direction, with_l2v_position=False, with_v2l_posi
     return res
 
 
-def log2vis_get_embedding_levels(unicode_text, base_direction):
+def log2vis_get_embedding_levels(unicode_text, base_direction=None):
 
     """
     Return an array containing the embedding-level of characters in the text.
 
     """
 
-    if unicode_text.__class__ != unicode:
+    if not isinstance(unicode_text, unicode):
         unicode_text = unicode(unicode_text)
+
+    if base_direction is None:
+        base_direction=CharType.LTR
 
     text_len = len(unicode_text)
 
@@ -345,7 +355,7 @@ def remove_bidi_marks(unicode_text, with_position_to=False, with_position_from=F
 
     """
 
-    if unicode_text.__class__ != unicode:
+    if not isinstance(unicode_text, unicode):
         unicode_text = unicode(unicode_text)
 
     text_len = len(unicode_text)
@@ -414,7 +424,7 @@ def get_types(unicode_text):
     TODO.
     """
 
-    if unicode_text.__class__ != unicode:
+    if not isinstance(unicode_text, unicode):
         unicode_text = unicode(unicode_text)
 
     text_len = len(unicode_text)
@@ -451,6 +461,112 @@ def get_types(unicode_text):
     return [i for i in output_chartype_p]
 
 
+def get_mirror_chars(unicode_text):
+
+    """
+    Return TODO
+
+    TODO.
+
+    *  fribidi_get_mirror_char() returns the mirrored character, if input
+    *  character has a mirror, or the input itself.
+    *  if mirrored_ch is NULL, just returns if character has a mirror or not.
+
+    """
+
+    if not isinstance(unicode_text, unicode):
+        unicode_text = unicode(unicode_text)
+
+    res = u''
+
+    for unicode_char in unicode_text:
+        text_len = len(unicode_text)
+
+        # Memory allocations
+
+        input_utf32_p = _pyunicode_to_utf32_p(unicode_char)
+
+        output_utf32_p = _malloc_int32_array(text_len+1)
+
+        # Calling the API
+
+        """
+        FRIBIDI_API fribidi_boolean fribidi_get_mirror_char (
+
+            /* Input */
+            FriBidiChar ch,
+
+            /* Output */
+            FriBidiChar *mirrored_ch
+        );
+        """
+
+        _libfribidi.fribidi_get_mirror_char(
+            # input
+            input_utf32_p[0],
+            # output
+            output_utf32_p
+        )
+
+        # Pythonizing the output
+
+        res += _utf32_p_to_pyunicode(output_utf32_p)
+
+    return res
+
+
+def get_mirror_prop(unicode_text):
+
+    """
+    Return TODO
+
+    TODO.
+
+    *  fribidi_get_mirror_char() returns the mirrored character, if input
+    *  character has a mirror, or the input itself.
+    *  if mirrored_ch is NULL, just returns if character has a mirror or not.
+
+    """
+
+    if not isinstance(unicode_text, unicode):
+        unicode_text = unicode(unicode_text)
+
+    res = []
+
+    for unicode_char in unicode_text:
+        text_len = len(unicode_text)
+
+        # Memory allocations
+
+        input_utf32_p = _pyunicode_to_utf32_p(unicode_char)
+
+        # Calling the API
+
+        """
+        FRIBIDI_API fribidi_boolean fribidi_get_mirror_char (
+
+            /* Input */
+            FriBidiChar ch,
+
+            /* Output */
+            FriBidiChar *mirrored_ch
+        );
+        """
+
+        is_mirror = _libfribidi.fribidi_get_mirror_char(
+            # input
+            input_utf32_p[0],
+            # output
+            None
+        )
+
+        # Pythonizing the output
+
+        res.append(is_mirror)
+
+    return res
+
+
 # Main
 
 def _main():
@@ -462,18 +578,23 @@ def _main():
 
     import sys
     text = ' '.join(sys.argv[1:]).decode('UTF-8')
-    print log2vis(text, CharType.LTR)
+    print log2vis(text)
 
 
 def _test():
 
     print
     print 'TEST log2vis()'
+    print
 
-    print log2vis(u"سلام", CharType.LTR)
-    print log2vis(u"سلام", CharType.LTR, True)
-    print log2vis(u"سلام", CharType.LTR, False, True)
-    print log2vis(u"سلام", CharType.LTR, False, False, True)
+    print log2vis(123)
+    print log2vis(u"سل‌ام")
+    print log2vis(u"سل‌ام").__class__
+    print
+
+    print log2vis(u"سلام", None, True)
+    print log2vis(u"سلام", None, False, True)
+    print log2vis(u"سلام", None, False, False, True)
 
     print log2vis(u"سلام", CharType.LTR, True, True, True)
     print log2vis(u"سلام", CharType.RTL, True, True, True)
@@ -486,6 +607,12 @@ def _test():
 
     print
     print 'TEST log2vis_get_embedding_levels()'
+    print
+
+    print log2vis_get_embedding_levels(123)
+    print log2vis_get_embedding_levels(u"سل‌ام")
+    print log2vis_get_embedding_levels(u"سل‌ام").__class__
+    print
 
     print log2vis_get_embedding_levels("abc", CharType.LTR)
     print log2vis_get_embedding_levels(u"aسلام", CharType.LTR)
@@ -493,6 +620,12 @@ def _test():
 
     print
     print 'TEST remove_bidi_marks()'
+    print
+
+    print remove_bidi_marks(123)
+    print remove_bidi_marks(u"سل‌ام")
+    print remove_bidi_marks(u"سل‌ام").__class__
+    print
 
     print remove_bidi_marks(u"سلامa")
     #print remove_bidi_marks(u"سلامa", False, True)
@@ -506,8 +639,38 @@ def _test():
 
     print
     print 'TEST get_types()'
+    print
 
+    print get_types(123)
     print get_types(u"سل‌ام")
+    print get_types(u"سل‌ام").__class__
+    print
+
+    print
+    print 'TEST get_mirror_chars()'
+    print
+
+    print get_mirror_chars(123)
+    print get_mirror_chars(u"سل‌ام")
+    print get_mirror_chars(u"سل‌ام").__class__
+    print
+
+    a="()"; print a, get_mirror_chars(a)
+    a=u"«»"; print a, get_mirror_chars(a)
+    a=u"﴾﴿"; print a, get_mirror_chars(a)
+
+    print
+    print 'TEST get_mirror_prop()'
+    print
+
+    print get_mirror_prop(123)
+    print get_mirror_prop(u"سل‌ام")
+    print get_mirror_prop(u"سل‌ام").__class__
+    print
+
+    a="()"; print a, get_mirror_prop(a)
+    a=u"«»"; print a, get_mirror_prop(a)
+    a=u"﴾﴿"; print a, get_mirror_prop(a)
 
 
 if __name__=='__main__':
