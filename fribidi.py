@@ -23,30 +23,120 @@ _libfribidi = ctypes.CDLL("libfribidi.so")
 try:
     _libfribidi.fribidi_shape()
 except AttributeError:
-    libfribidi_version = '0.1'
+    libfribidi_version = '0.10'
     libfribidi_version_major = 0
-    libfribidi_version_minor = 1
+    libfribidi_version_minor = 10
 else:
-    libfribidi_version = '0.2'
+    libfribidi_version = '0.19'
     libfribidi_version_major = 0
-    libfribidi_version_minor = 2
+    libfribidi_version_minor = 19
 
 print libfribidi_version, libfribidi_version_major, libfribidi_version_minor
 
 
 # Versions
 
-VERSION = '0.09'
+VERSION = '0.10'
 "Version of the python wrapper."
 
 
-# Character Types
+# Character and Paragraph Types
+
+class Mask:
+    """
+    TODO.
+    """
+
+    # Mask values
+
+    RTL        = 0x00000001   # Is right to left
+    ARABIC     = 0x00000002   # Is arabic
+
+    # Each character can be only one of the three following:
+    STRONG     = 0x00000010   # Is strong
+    WEAK       = 0x00000020   # Is weak
+    NEUTRAL    = 0x00000040   # Is neutral
+    SENTINEL   = 0x00000080   # Is sentinel
+    # Sentinels are not valid chars, just identify the start/end of strings.
+
+    # Each charcter can be only one of the five following:
+    LETTER     = 0x00000100   # Is letter: L, R, AL
+    NUMBER     = 0x00000200   # Is number: EN, AN
+    NUMSEPTER  = 0x00000400   # Is number separator or terminator: ES, ET, CS
+    SPACE      = 0x00000800   # Is space: BN, BS, SS, WS
+    EXPLICIT   = 0x00001000   # Is expilict mark: LRE, RLE, LRO, RLO, PDF
+
+    # Can be set only if Mask.SPACE is also set.
+    SEPARATOR  = 0x00002000   # Is test separator: BS, SS
+
+    OVERRIDE   = 0x00004000   # Is explicit override: LRO, RLO
+
+    # The following must be to make types pairwise different, some of them can
+    # be removed but are here because of efficiency (make queries faster).
+
+    ES     = 0x00010000
+    ET     = 0x00020000
+    CS     = 0x00040000
+
+    NSM    = 0x00080000
+    BN     = 0x00100000
+
+    BS     = 0x00200000
+    SS     = 0x00400000
+    WS     = 0x00800000
+
+    # We reserve a single bit for user's private use: we will never use it. */
+    PRIVATE = 0x01000000
+
+
+class Type:
+    """
+    TODO.
+    """
+
+    # Strong types
+
+    LTR     = (Mask.STRONG + Mask.LETTER)                               # Left-To-Right letter
+    RTL     = (Mask.STRONG + Mask.LETTER + Mask.RTL)                    # Right-To-Left letter
+    AL      = (Mask.STRONG + Mask.LETTER + Mask.RTL + Mask.ARABIC)      # Arabic Letter
+    LRE     = (Mask.STRONG + Mask.EXPLICIT)                             # Left-to-Right Embedding
+    RLE     = (Mask.STRONG + Mask.EXPLICIT + Mask.RTL)                  # Right-to-Left Embedding
+    LRO     = (Mask.STRONG + Mask.EXPLICIT + Mask.OVERRIDE)             # Left-to-Right Override
+    RLO     = (Mask.STRONG + Mask.EXPLICIT + Mask.RTL + Mask.OVERRIDE)  # Right-to-Left Override
+
+    # Weak types
+
+    PDF     = (Mask.WEAK + Mask.EXPLICIT)                               # Pop Directional Override
+    EN      = (Mask.WEAK + Mask.NUMBER)                                 # European Numeral
+    AN      = (Mask.WEAK + Mask.NUMBER + Mask.ARABIC)                   # Arabic Numeral
+    ES      = (Mask.WEAK + Mask.NUMSEPTER + Mask.ES)                    # European number Separator
+    ET      = (Mask.WEAK + Mask.NUMSEPTER + Mask.ET)                    # European number Terminator
+    CS      = (Mask.WEAK + Mask.NUMSEPTER + Mask.CS)                    # Common Separator
+    NSM     = (Mask.WEAK + Mask.NSM)                                    # Non Spacing Mark
+    BN      = (Mask.WEAK + Mask.SPACE + Mask.BN)                        # Boundary Neutral
+
+    # Neutral types
+
+    BS      = (Mask.NEUTRAL + Mask.SPACE + Mask.SEPARATOR + Mask.BS)    # Block Separator
+    SS      = (Mask.NEUTRAL + Mask.SPACE + Mask.SEPARATOR + Mask.SS)    # Segment Separator
+    WS      = (Mask.NEUTRAL + Mask.SPACE + Mask.WS)                     # WhiteSpace
+    ON      = (Mask.NEUTRAL)                                            # Other Neutral
+
+    # Paragraph types
+
+    WLTR        = Mask.WEAK                 # Weak Left-To-Right
+    WRTL        = Mask.WEAK | Mask.RTL      # Weak Right-To-Left
+
+    SENTINEL    = Mask.SENTINEL             # start or end of text (run list) SENTINEL
+                                            # Only used internally
+
+    PRIVATE     = Mask.PRIVATE              # Private types for applications
+                                            # More private types can be obtained by summing up from this one
+
 
 class CharType:
     """
-    Class of character types, as return by get_types(), etc.
-
-    Types:
+    Class of character (direction) types:
 
         LTR     Strong left to right
         RTL     Right to left characters
@@ -72,64 +162,44 @@ class CharType:
 
     """
 
-    # Define Masks
+    LTR = Type.LTR
+    RTL = Type.RTL
+    AL  = Type.AL
+    EN  = Type.EN
+    AN  = Type.AN
+    ES  = Type.ES
+    ET  = Type.ET
+    CS  = Type.CS
+    NSM = Type.NSM
+    BN  = Type.BN
+    BS  = Type.BS
+    SS  = Type.SS
+    WS  = Type.WS
+    ON  = Type.ON
+    LRE = Type.LRE
+    RLE = Type.RLE
+    LRO = Type.LRO
+    RLO = Type.RLO
+    PDF = Type.PDF
 
-    MASK_RTL        = 0x00000001   # Is right to left
-    MASK_ARABIC     = 0x00000002   # Is arabic
 
-    # Each character can be only one of the three following:
-    MASK_STRONG     = 0x00000010   # Is strong
-    MASK_WEAK       = 0x00000020   # Is weak
-    MASK_NEUTRAL    = 0x00000040   # Is neutral
+class ParType:
+    """
+    Class of paragraph (direction) types:
 
-    # Each charcter can be only one of the five following:
-    MASK_LETTER     = 0x00000100   # Is letter: L, R, AL
-    MASK_NUMBER     = 0x00000200   # Is number: EN, AN
-    MASK_NUMSEPTER  = 0x00000400   # Is number separator or terminator: ES, ET, CS
-    MASK_SPACE      = 0x00000800   # Is space: BN, BS, SS, WS
-    MASK_EXPLICIT   = 0x00001000   # Is expilict mark: LRE, RLE, LRO, RLO, PDF
+        LTR     Left-to-Right paragraph
+        RTL     Right-to-Left paragraph
+        ON      Other Neutral
+        WLTR    Weak Left-to-Right
+        WRTL    Weak Right-to-Left
 
-    MASK_SEPARATOR  = 0x00002000   # Is test separator: BS, SS
+    """
 
-    MASK_OVERRIDE   = 0x00004000   # Is explicit override: LRO, RLO
-
-    # The following must be to make types pairwise different, some of them can
-    # be removed but are here because of efficiency (make queries faster).
-
-    MASK_ES     = 0x00010000
-    MASK_ET     = 0x00020000
-    MASK_CS     = 0x00040000
-
-    MASK_NSM    = 0x00080000
-    MASK_BN     = 0x00100000
-
-    MASK_BS     = 0x00200000
-    MASK_SS     = 0x00400000
-    MASK_WS     = 0x00800000
-
-    # Define values for FriBidiCharType
-
-    LTR     = (MASK_STRONG + MASK_LETTER)                               # Strong left to right
-    RTL     = (MASK_STRONG + MASK_LETTER + MASK_RTL)                    # Right to left characters
-    AL      = (MASK_STRONG + MASK_LETTER + MASK_RTL + MASK_ARABIC)      # Arabic characters
-    LRE     = (MASK_STRONG + MASK_EXPLICIT)                             # Left-To-Right embedding
-    RLE     = (MASK_STRONG + MASK_EXPLICIT + MASK_RTL)                  # Right-To-Left embedding
-    LRO     = (MASK_STRONG + MASK_EXPLICIT + MASK_OVERRIDE)             # Left-To-Right override
-    RLO     = (MASK_STRONG + MASK_EXPLICIT + MASK_RTL + MASK_OVERRIDE)  # Right-To-Left override
-
-    PDF     = (MASK_WEAK + MASK_EXPLICIT)                               # Pop directional override
-    EN      = (MASK_WEAK + MASK_NUMBER)                                 # European digit
-    AN      = (MASK_WEAK + MASK_NUMBER + MASK_ARABIC)                   # Arabic digit
-    ES      = (MASK_WEAK + MASK_NUMSEPTER + MASK_ES)                    # European number separator
-    ET      = (MASK_WEAK + MASK_NUMSEPTER + MASK_ET)                    # European number terminator
-    CS      = (MASK_WEAK + MASK_NUMSEPTER + MASK_CS)                    # Common Separator
-    NSM     = (MASK_WEAK + MASK_NSM)                                    # Non spacing mark
-    BN      = (MASK_WEAK + MASK_SPACE + MASK_BN)                        # Boundary neutral
-
-    BS      = (MASK_NEUTRAL + MASK_SPACE + MASK_SEPARATOR + MASK_BS)    # Block separator
-    SS      = (MASK_NEUTRAL + MASK_SPACE + MASK_SEPARATOR + MASK_SS)    # Segment separator
-    WS      = (MASK_NEUTRAL + MASK_SPACE + MASK_WS)                     # Whitespace
-    ON      = (MASK_NEUTRAL)                                            # Other Neutral
+    LTR     = Type.LTR
+    RTL     = Type.RTL
+    ON      = Type.ON
+    WLTR    = Type.WLTR
+    WRTL    = Type.WRTL
 
 
 # Memory allocation functions
