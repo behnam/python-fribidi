@@ -44,7 +44,8 @@ VERSION = '0.10'
 
 def _malloc_int_array(n):
 
-    """Return a pointer to allocated C int array of length `n'.
+    """
+    Return a pointer to allocated C int array of length `n'.
     """
 
     t = ctypes.c_int * n
@@ -53,7 +54,8 @@ def _malloc_int_array(n):
 
 def _malloc_int8_array(n):
 
-    """Return a pointer to allocated C int array of length `n'.
+    """
+    Return a pointer to allocated C int array of length `n'.
     """
 
     t = ctypes.c_int8 * n
@@ -62,16 +64,39 @@ def _malloc_int8_array(n):
 
 def _malloc_int32_array(n):
 
-    """Return a pointer to allocated UTF32 (C int32) array of length `n'.
+    """
+    Return a pointer to allocated C int32 array of length `n'.
     """
 
     t = ctypes.c_uint32 * n
     return t()
 
 
+def _malloc_int32_array_from_list(a, n=None):
+
+    """
+    Return a pointer to allocated C int32 array of length `n', initialized with `a'
+
+    If `n' is not set, the length of `a' will be considered.
+    """
+
+    if n is None:
+        n = len(a)
+
+    # Memory allocations
+
+    m = _malloc_int32_array(n)
+
+    for i in xrange(n):
+        m[i] = a[i]
+
+    return m()
+
+
 def _malloc_char_array(n):
 
-    """Return a pointer to allocated UTF8 (C char) array of length `n'.
+    """
+    Return a pointer to allocated UTF8 (C char) array of length `n'.
     """
 
     t = ctypes.c_char * n
@@ -80,7 +105,8 @@ def _malloc_char_array(n):
 
 def _malloc_char_array_from_string(s):
 
-    """Return a pointer to allocated UTF8 (C char) array, initialized with `s'.
+    """
+    Return a pointer to allocated UTF8 (C char) array, initialized with `s'.
     """
 
     return ctypes.c_char_p(s)
@@ -118,6 +144,8 @@ def _utf32_p_to_pyunicode(a_utf32_p):
     return utf8_p.value.decode('UTF-8')
 
 
+# ########################################################################
+# FriBidi API, Bidi, Types (fribidi-bidi-types.h)
 
 # Character and Paragraph Masks and Types
 
@@ -287,8 +315,6 @@ class ParType:
     WRTL    = _Type.WRTL
 
 
-# FriBidi API, Bidi part
-
 def level_is_rtl(lev):
 
     """
@@ -332,7 +358,126 @@ def dir_to_level(dir):
      
     return 1 if dir_is_rtl(dir) else 0
 
+# TODO: More dir functions (probabely should put into Type class)
+# fribidi-bidi-types.h: 283-334
 
+
+# Functions
+
+def get_bidi_types(unicode_text):
+
+    """
+    Return characters bidi types.
+
+    This function returns the bidi type of a character as defined in Table 3.7
+    Bidirectional Character Types of the Unicode Bidirectional Algorithm
+    available at
+    http://www.unicode.org/reports/tr9/#Bidirectional_Character_Types, using
+    data provided in file UnicodeData.txt of the Unicode Character Database
+    available at http://www.unicode.org/Public/UNIDATA/UnicodeData.txt .
+
+    """
+    # TOD: There are a few macros defined in fribidi-bidi-types.h for querying a bidi type.
+
+
+    if not isinstance(unicode_text, unicode):
+        unicode_text = unicode(unicode_text)
+
+    text_len = len(unicode_text)
+
+    # Memory allocations
+
+    input_utf32_p = _pyunicode_to_utf32_p(unicode_text)
+
+    output_chartype_p = _malloc_int32_array(text_len)
+
+    # Calling the API
+
+    """
+    FRIBIDI_ENTRY void fribidi_get_bidi_types (
+        const FriBidiChar *str,     /* input string */
+        const FriBidiStrIndex len,  /* input string length */
+        FriBidiCharType *btypes     /* output bidi types */
+    );
+    """
+
+    if libfribidi_version_minor <= 10:
+        _libfribidi.fribidi_get_types(
+            input_utf32_p,          # input string
+            text_len,               # input string length
+            output_chartype_p       # output bidi types
+        )
+
+    else:
+        _libfribidi.fribidi_get_bidi_types(
+            input_utf32_p,          # input string
+            text_len,               # input string length
+            output_chartype_p       # output bidi types
+        )
+
+    # Pythonizing the output
+
+    return [i for i in output_chartype_p]
+
+
+# TODO: fribidi_get_bidi_type_name
+
+
+# ########################################################################
+# FriBidi API, Bidi (fribidi-bidi.h)
+
+
+def get_par_direction(bidi_types_list, text_len=None):
+
+    """
+    Return base paragraph direction
+
+    This function finds the base direction of a single paragraph,
+    as defined by rule P2 of the Unicode Bidirectional Algorithm available at
+    http://www.unicode.org/reports/tr9/#P2.
+
+    You typically do not need this function as get_par_embedding_levels() knows
+    how to compute base direction itself, but you may need this to implement a
+    more sophisticated paragraph direction handling.
+    
+    Note that you can pass more than a paragraph to this function and the
+    direction of the first non-neutral paragraph is returned, which is a very
+    good heuristic to set direction of the neutral paragraphs at the beginning
+    of text.  For other neutral paragraphs, you better use the direction of the
+    previous paragraph.
+
+    Input: List of bidi types as returned by get_bidi_types()
+
+    Returns: Base pargraph direction.  No weak paragraph direction is returned,
+    only LTR, RTL, or ON.
+
+    """
+
+    # Memory allocations
+
+    input_chartype_p = _malloc_int32_array_from_list(bidi_types_list, text_len)
+
+    # Calling the API
+
+    '''
+    FRIBIDI_ENTRY FriBidiParType fribidi_get_par_direction (
+      const FriBidiCharType *bidi_types,    /* input list of bidi types as returned by fribidi_get_bidi_types() */
+      const FriBidiStrIndex len             /* input string length */
+    );
+    '''
+
+    par_type = _libfribidi.fribidi_get_par_direction(
+        input_chartype_p,   # input bidi types
+        text_len            # input string length
+    )
+
+    # Pythonizing the output
+
+    return int(par_type)
+
+
+
+# ########################################################################
 # FriBidi API, Misc
 
 def log2vis(unicode_text, base_direction=None, with_l2v_position=False, with_v2l_position=False, with_embedding_level=False):
@@ -549,51 +694,6 @@ def remove_bidi_marks(unicode_text, with_position_to=False, with_position_from=F
         res = output_u
 
     return res
-
-
-def get_types(unicode_text):
-
-    """
-    Return TODO
-
-    TODO.
-    """
-
-    if not isinstance(unicode_text, unicode):
-        unicode_text = unicode(unicode_text)
-
-    text_len = len(unicode_text)
-
-    # Memory allocations
-
-    input_utf32_p = _pyunicode_to_utf32_p(unicode_text)
-
-    output_chartype_p = _malloc_int32_array(text_len)
-
-    # Calling the API
-
-    """
-    FRIBIDI_API void fribidi_get_types (
-
-        /* input */
-        FriBidiChar *str,
-        FriBidiStrIndex len,
-
-        /* output */
-        FriBidiCharType *type
-    );
-    """
-
-    _libfribidi.fribidi_get_types(
-        # input
-        input_utf32_p,
-        text_len,
-        output_chartype_p
-    )
-
-    # Pythonizing the output
-
-    return [i for i in output_chartype_p]
 
 
 def get_mirror_chars(unicode_text):
