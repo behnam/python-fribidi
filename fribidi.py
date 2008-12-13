@@ -362,7 +362,7 @@ def dir_to_level(dir):
 
 # Functions
 
-def get_bidi_types(unicode_text):
+def get_bidi_types(unicode_text, text_length=None):
 
     """
     Return characters bidi types.
@@ -381,13 +381,14 @@ def get_bidi_types(unicode_text):
     if not isinstance(unicode_text, unicode):
         unicode_text = unicode(unicode_text)
 
-    text_len = len(unicode_text)
+    if not text_length:
+        text_length = len(unicode_text)
 
     # Memory allocations
 
     input_utf32_p = _pyunicode_to_utf32_p(unicode_text)
 
-    output_chartype_p = _malloc_int32_array(text_len)
+    output_chartype_p = _malloc_int32_array(text_length)
 
     # Calling the API
 
@@ -402,14 +403,14 @@ def get_bidi_types(unicode_text):
     if libfribidi_version_minor <= 10:
         _libfribidi.fribidi_get_types(
             input_utf32_p,          # input string
-            text_len,               # input string length
+            text_length,            # input string length
             output_chartype_p       # output bidi types
         )
 
     else:
         _libfribidi.fribidi_get_bidi_types(
             input_utf32_p,          # input string
-            text_len,               # input string length
+            text_length,            # input string length
             output_chartype_p       # output bidi types
         )
 
@@ -425,10 +426,14 @@ def get_bidi_types(unicode_text):
 # FriBidi API, Bidi (fribidi-bidi.h)
 
 
-def get_par_direction(bidi_types_list, text_len=None):
+def get_par_direction(bidi_types_list, text_length=None):
 
     """
     Return base paragraph direction
+
+    No weak paragraph direction is returned, only LTR, RTL, or ON.
+
+    Input: List of bidi types as returned by get_bidi_types()
 
     This function finds the base direction of a single paragraph,
     as defined by rule P2 of the Unicode Bidirectional Algorithm available at
@@ -444,16 +449,14 @@ def get_par_direction(bidi_types_list, text_len=None):
     of text.  For other neutral paragraphs, you better use the direction of the
     previous paragraph.
 
-    Input: List of bidi types as returned by get_bidi_types()
-
-    Returns: Base pargraph direction.  No weak paragraph direction is returned,
-    only LTR, RTL, or ON.
-
     """
+
+    if not text_length:
+        text_length = len(bidi_types_list)
 
     # Memory allocations
 
-    input_chartype_p = _malloc_int32_array_from_list(bidi_types_list, text_len)
+    input_bidi_types_p = _malloc_int32_array_from_list(bidi_types_list, text_length)
 
     # Calling the API
 
@@ -465,8 +468,8 @@ def get_par_direction(bidi_types_list, text_len=None):
     '''
 
     par_type = _libfribidi.fribidi_get_par_direction(
-        input_chartype_p,   # input bidi types
-        text_len            # input string length
+        input_bidi_types_p, # input bidi types
+        text_length         # input string length
     )
 
     # Pythonizing the output
@@ -474,11 +477,78 @@ def get_par_direction(bidi_types_list, text_len=None):
     return int(par_type)
 
 
+def get_par_embedding_levels(bidi_types_list, text_length=None,
+                                base_direction=None):
+
+    """
+    Return the list of embedding levels of characters in the paragraph.
+
+    A tuple of list of embedding levels, resolved paragraph direction, and
+    maximum embedding level will be returned.
+
+    Input: List of bidi types as returned by get_bidi_types()
+
+    This function finds the bidi embedding levels of a single paragraph,
+    as defined by the Unicode Bidirectional Algorithm available at
+    http://www.unicode.org/reports/tr9/.  This function implements rules P2 to
+    I1 inclusive, and parts 1 to 3 of L1, except for rule X9 which is
+    implemented in remove_bidi_marks().  Part 4 of L1 is implemented in
+    reorder_line().
+
+    """
+
+    # TODO: There are a few macros defined in fribidi-bidi-types.h to work with this embedding levels.
+
+    if not text_length:
+        text_length = len(bidi_types_list)
+
+    if base_direction is None:
+        base_direction=ParType.LTR
+
+    # Memory allocations
+
+    input_bidi_types_p = _malloc_int32_array_from_list(bidi_types_list, text_length)
+    pbase_dir_p = ctypes.pointer(ctypes.c_int32(base_direction))
+
+    emb_p = _malloc_int8_array(text_length)
+
+    # Calling the API
+
+    """
+    FRIBIDI_ENTRY FriBidiLevel fribidi_get_par_embedding_levels (
+        const FriBidiCharType *bidi_types,  /* input list of bidi types as returned by fribidi_get_bidi_types() */
+        const FriBidiStrIndex len,          /* input string length of the paragraph */
+        FriBidiParType *pbase_dir,          /* requested and resolved paragraph base direction */
+        FriBidiLevel *embedding_levels      /* output list of embedding levels */
+    ) FRIBIDI_GNUC_WARN_UNUSED;
+    """
+
+    success = _libfribidi.fribidi_get_par_embedding_levels(
+        input_bidi_types_p, # input list of bidi types as returned by get_bidi_types()
+        text_length,        # input string length of the paragraph
+        pbase_dir_p,        # requested and resolved paragraph base direction
+        emb_p               # output list of embedding levels
+    )
+
+    if not success:
+        raise Exception('fribidi_get_par_embedding_levels failed')
+
+    # Pythonizing the output
+
+    max_levels = success - 1
+
+    output_levels_list = [i for i in emb_p]
+
+    return [output_levels_list, pbase_dir_p[0], max_levels]
+
+
 
 # ########################################################################
 # FriBidi API, Misc
 
-def log2vis(unicode_text, base_direction=None, with_l2v_position=False, with_v2l_position=False, with_embedding_level=False):
+def log2vis(unicode_text, text_length=None, base_direction=None,
+            with_l2v_position=False, with_v2l_position=False,
+            with_embedding_level=False):
     """
     Return a unicode text contaning the visual order of characters in the text.
 
@@ -495,21 +565,23 @@ def log2vis(unicode_text, base_direction=None, with_l2v_position=False, with_v2l
     if not isinstance(unicode_text, unicode):
         unicode_text = unicode(unicode_text)
 
+    if not text_length:
+        text_length = len(unicode_text)
+
     if base_direction is None:
         base_direction=ParType.LTR
 
-    text_len = len(unicode_text)
 
     # Memory allocations
 
     input_utf32_p = _pyunicode_to_utf32_p(unicode_text)
     pbase_dir_p = ctypes.pointer(ctypes.c_int32(base_direction))
 
-    output_utf32_p = _malloc_int32_array(text_len+1)
+    output_utf32_p = _malloc_int32_array(text_length+1)
 
-    l2v_p = _malloc_int_array(text_len)     if with_l2v_position    else None
-    v2l_p = _malloc_int_array(text_len)     if with_v2l_position    else None
-    emb_p = _malloc_int8_array(text_len)    if with_embedding_level else None
+    l2v_p = _malloc_int_array(text_length)  if with_l2v_position    else None
+    v2l_p = _malloc_int_array(text_length)  if with_v2l_position    else None
+    emb_p = _malloc_int8_array(text_length) if with_embedding_level else None
 
     # Calling the API
 
@@ -532,7 +604,7 @@ def log2vis(unicode_text, base_direction=None, with_l2v_position=False, with_v2l
     successed = _libfribidi.fribidi_log2vis(
         # input
         input_utf32_p,
-        text_len,
+        text_length,
         pbase_dir_p,
 
         # output
@@ -618,7 +690,9 @@ def log2vis_get_embedding_levels(unicode_text, base_direction=None):
     return res
 
 
-def remove_bidi_marks(unicode_text, with_position_to=False, with_position_from=False, with_embedding_level=False):
+def remove_bidi_marks(unicode_text, text_length=None,
+                        with_position_to=False, with_position_from=False,
+                        with_embedding_level=False):
 
     """
     Return the text with all Bidirectional Marks removed.
@@ -636,15 +710,16 @@ def remove_bidi_marks(unicode_text, with_position_to=False, with_position_from=F
     if not isinstance(unicode_text, unicode):
         unicode_text = unicode(unicode_text)
 
-    text_len = len(unicode_text)
+    if not text_length:
+        text_length = len(unicode_text)
 
     # Memory allocations
 
     input_utf32_p = _pyunicode_to_utf32_p(unicode_text)
 
-    pto_p = _malloc_int_array(text_len)     if with_position_to     else None
-    pfr_p = _malloc_int_array(text_len)     if with_position_from   else None
-    emb_p = _malloc_int8_array(text_len)    if with_embedding_level else None
+    pto_p = _malloc_int_array(text_length)  if with_position_to     else None
+    pfr_p = _malloc_int_array(text_length)  if with_position_from   else None
+    emb_p = _malloc_int8_array(text_length) if with_embedding_level else None
 
     # Calling the API
 
@@ -669,7 +744,7 @@ def remove_bidi_marks(unicode_text, with_position_to=False, with_position_from=F
         input_utf32_p,
 
         # input
-        text_len,
+        text_length,
 
         # output
         pto_p,
@@ -713,13 +788,13 @@ def get_mirror_chars(unicode_text):
     res = u''
 
     for unicode_char in unicode_text:
-        text_len = len(unicode_text)
+        text_length = len(unicode_text)
 
         # Memory allocations
 
         input_utf32_p = _pyunicode_to_utf32_p(unicode_char)
 
-        output_utf32_p = _malloc_int32_array(text_len+1)
+        output_utf32_p = _malloc_int32_array(text_length+1)
 
         # Calling the API
 
@@ -767,7 +842,6 @@ def get_mirror_prop(unicode_text):
     res = []
 
     for unicode_char in unicode_text:
-        text_len = len(unicode_text)
 
         # Memory allocations
 
