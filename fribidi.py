@@ -90,7 +90,7 @@ def _malloc_int32_array_from_list(a, n=None):
     for i in xrange(n):
         m[i] = a[i]
 
-    return m()
+    return m
 
 
 def _malloc_char_array(n):
@@ -355,7 +355,7 @@ def dir_to_level(dir):
     Return 0 for LTR and 1 for RTL.
 
     """
-     
+
     return 1 if dir_is_rtl(dir) else 0
 
 # TODO: More dir functions (probabely should put into Type class)
@@ -439,7 +439,7 @@ def get_par_direction(bidi_types_list, text_len=None):
     You typically do not need this function as get_par_embedding_levels() knows
     how to compute base direction itself, but you may need this to implement a
     more sophisticated paragraph direction handling.
-    
+
     Note that you can pass more than a paragraph to this function and the
     direction of the first non-neutral paragraph is returned, which is a very
     good heuristic to set direction of the neutral paragraphs at the beginning
@@ -887,16 +887,25 @@ def _test():
     #print remove_bidi_marks(u"سل‌ام", False, True)
     #print remove_bidi_marks(u"سل‌ام", False, False, True)
 
-    if libfribidi_version_major == 1:
-        print
-        print 'TEST get_types()'
-        print
+    print
+    print 'TEST get_bidi_types()'
+    print
 
-        print get_types(123)
-        print get_types(u"سل‌ام")
-        print get_types(u"سل‌ام").__class__
-        print
+    print get_bidi_types(123)
+    print get_bidi_types(u"سل‌ام")
+    print get_bidi_types(u"سل‌ام").__class__
+    print
 
+    print
+    print 'TEST get_par_direction()'
+    print
+
+    print get_par_direction(get_bidi_types(123))
+    print get_par_direction(get_bidi_types(u"سل‌ام"))
+    print get_par_direction(get_bidi_types(u"سل‌ام")).__class__
+    print
+
+    '''
     print
     print 'TEST get_mirror_chars()'
     print
@@ -926,6 +935,7 @@ def _test():
     print
 
     print get_version_info()
+    '''
 
 if __name__=='__main__':
     _main()
