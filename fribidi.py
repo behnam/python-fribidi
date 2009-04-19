@@ -542,6 +542,99 @@ def get_par_embedding_levels(bidi_types_list, text_length=None,
     return [output_levels_list, pbase_dir_p[0], max_levels]
 
 
+def reorder_line(bidi_types_list, text_length=None, line_offset=0,
+                    base_direction=None, with_max_levels=False):
+
+    """
+    Return visual reordered of a line of logical string
+    """
+
+    # TODO
+
+    """
+    This function reorders the characters in a line of text from logical to
+    final visual order.  This function implements part 4 of rule L1, and rules
+    L2 and L3 of the Unicode Bidirectional Algorithm available at
+    http://www.unicode.org/reports/tr9/#Reordering_Resolved_Levels.
+
+    As a side effect it also sets position maps if not NULL.
+
+    You should provide the resolved paragraph direction and embedding levels as
+    set by fribidi_get_par_embedding_levels().  Also note that the embedding
+    levels may change a bit.  To be exact, the embedding level of any sequence
+    of white space at the end of line is reset to the paragraph embedding level
+    (That is part 4 of rule L1).
+
+    Note that the bidi types and embedding levels are not reordered.  You can
+    reorder these (or any other) arrays using the map later.  The user is
+    responsible to initialize map to something sensible, like an identity
+    mapping, or pass NULL if no map is needed.
+
+    There is an optional part to this function, which is whether non-spacing
+    marks for right-to-left parts of the text should be reordered to come after
+    their base characters in the visual string or not.  Most rendering engines
+    expect this behavior, but console-based systems for example do not like it.
+    This is controlled by the FRIBIDI_FLAG_REORDER_NSM flag.  The flag is on
+    in FRIBIDI_FLAGS_DEFAULT.
+
+    Returns: Maximum level found in this line plus one, or zero if any error
+    occured (memory allocation failure most probably).
+
+    """
+
+    if not text_length:
+        text_length = len(bidi_types_list)
+
+    if base_direction is None:
+        base_direction=ParType.LTR
+
+    # Memory allocations
+
+    input_bidi_types_p = _malloc_int32_array_from_list(bidi_types_list, text_length)
+    pbase_dir_p = ctypes.pointer(ctypes.c_int32(base_direction))
+
+    emb_p = _malloc_int8_array(text_length)
+
+    # Calling the API
+
+    """
+    FRIBIDI_ENTRY FriBidiLevel fribidi_reorder_line (
+        FriBidiFlags flags,                 /* reorder flags */
+        const FriBidiCharType *bidi_types,  /* input list of bidi types as returned by fribidi_get_bidi_types() */
+        const FriBidiStrIndex len,          /* input length of the line */
+        const FriBidiStrIndex off,          /* input offset of the beginning of the line in the paragraph */
+        const FriBidiParType base_dir,      /* resolved paragraph base direction */
+        FriBidiLevel *embedding_levels,     /* input list of embedding levels, as returned by fribidi_get_par_embedding_levels */
+        FriBidiChar *visual_str,            /* visual string to reorder */
+        FriBidiStrIndex *map                /* a map of string indices which is reordered to reflect where each glyph ends up. */
+    ) FRIBIDI_GNUC_WARN_UNUSED;
+    """
+
+    success = _libfribidi.fribidi_get_par_embedding_levels(
+        input_flags,        # reorder flags
+        input_bidi_types_p, # input list of bidi types as returned by get_bidi_types()
+        text_length,        # input string length of the paragraph
+        line_offset,        # input offset of the beginning of the line in the paragraph
+        pbase_dir_p,        # requested and resolved paragraph base direction
+        emb_p,               # output list of embedding levels
+        embedding_levels_p  # input list of embedding levels, as returned by get_par_embedding_levels()
+    )
+
+    if not success:
+        raise Exception('fribidi_get_par_embedding_levels failed')
+
+    # Pythonizing the output
+
+    max_levels = success - 1
+
+    output_levels_list = [i for i in emb_p]
+
+    if with_max_levels:
+        return [output_levels_list, max_levels]
+    else:
+        return output_levels_list
+
+
 
 # ########################################################################
 # FriBidi API, Misc
